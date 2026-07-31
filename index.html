@@ -1027,13 +1027,14 @@ body {
   background:linear-gradient(160deg,#0b1220 0%,#0f172a 50%,#111827 100%);
   padding:24px;text-align:center;
 ">
-  <div style="
+  <div id="geoLockIcon" style="
     width:120px;height:120px;border-radius:50%;
     background:#111827;
     box-shadow:10px 10px 22px #060a12, -10px -10px 22px #1c2942;
     display:flex;align-items:center;justify-content:center;
     margin-bottom:28px;
     animation:geoPulse 2.2s ease-in-out infinite;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
   ">
     <span style="font-size:52px;">🔒</span>
   </div>
@@ -11293,6 +11294,13 @@ function spawnParticles(origin){
   const COMPANY_LNG = 3.0773326;
   const MAX_DISTANCE_METERS = 80;
 
+  // مسح وضع اختبار الواجهة عبر رابط خاص (لتسهيل الإيقاف من متصفح الهاتف بدون Console)
+  // مثال: أضف #resetdev في نهاية رابط الصفحة ثم افتحه
+  if (location.hash === '#resetdev') {
+    localStorage.removeItem('isDev');
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+
   const lockScreen = document.getElementById('geoLockScreen');
   const statusEl = document.getElementById('geoLockStatus');
   let isLocked = true;
@@ -11355,9 +11363,48 @@ function spawnParticles(origin){
     });
   }
 
-  // Lock the app immediately on load, before the first GPS fix arrives
-  lockApp('🔍 جارٍ التحقق من الموقع...');
-  startGeofence();
+  // ===== Developer Options — UI Testing Bypass =====
+  // اضغط مطوّلاً (بدون رفع الإصبع) على أيقونة القفل لمدة كافية لتفعيل/تعطيل
+  // وضع اختبار الواجهة، والذي يتيح تجربة التطبيق دون المرور بفحص الموقع الجغرافي.
+  const HOLD_MS = 3200;
+  let __holdTimer = null;
+  function __toggleDevMode(){
+    const devModeOn = localStorage.getItem('isDev') === 'true';
+    if (devModeOn) {
+      localStorage.removeItem('isDev');
+      location.reload();
+    } else {
+      localStorage.setItem('isDev', 'true');
+      unlockApp();
+    }
+  }
+  function __armHold(){
+    clearTimeout(__holdTimer);
+    __holdTimer = setTimeout(__toggleDevMode, HOLD_MS);
+  }
+  function __disarmHold(){
+    clearTimeout(__holdTimer);
+  }
+  const iconEl = document.getElementById('geoLockIcon');
+  if (iconEl) {
+    iconEl.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    iconEl.addEventListener('touchstart', function(e){ __armHold(); }, {passive:true});
+    iconEl.addEventListener('touchend', __disarmHold, {passive:true});
+    iconEl.addEventListener('touchcancel', __disarmHold, {passive:true});
+    iconEl.addEventListener('touchmove', __disarmHold, {passive:true});
+    iconEl.addEventListener('mousedown', __armHold);
+    iconEl.addEventListener('mouseup', __disarmHold);
+    iconEl.addEventListener('mouseleave', __disarmHold);
+  }
+
+  // Lock the app immediately on load, before the first GPS fix arrives —
+  // إلا إذا كان وضع اختبار الواجهة (Developer Options) مفعّلاً مسبقاً
+  if (localStorage.getItem('isDev') === 'true') {
+    unlockApp();
+  } else {
+    lockApp('🔍 جارٍ التحقق من الموقع...');
+    startGeofence();
+  }
 })();
 </script>
 
